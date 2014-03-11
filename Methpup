@@ -1,0 +1,173 @@
+#!/bin/bash 
+
+PHRED=33
+LINFORMIN=5
+LINREVMIN=4
+MIN=10
+MAX=222
+
+function usage() {
+    echo "syntax: $0"
+    echo " 
+    -i --indir      The directory saves all input raw fastq files.
+    
+    -o --outdir     Create all output files in the specified output directory.
+                    Please note that this directory must exist as the program
+                    will not create it.
+    
+    -q --queue	    Customized bash files to submit parallele jobs in q. If 
+       		    not supplied, the jobs would run locally in current terminal.
+		    
+    --phred         Input qualities are ASCII chars equal to the Phred quality 
+                    plus 33 (by default). This is also called the "Phred+33" encoding,
+                    which is used by the very latest Illumina pipelines.
+
+    -f --forseq     The linker sequence that links barcode/adapter and target region in
+       		    the 5'end.
+
+    -r --revseq     The linker sequence that links target region and adapter in
+       		    the 3'end.
+
+    -l --seqlen     The length of the linker sequence
+
+    --formin        Minimum overlap length between the read and the linker in 
+    		    forward reads. If the overlap is shorter than LENGTH, the
+		    read is not modified. This reduces the number of bases 
+		    trimmed purely due to short random adapter matches (default:
+                    5)
+    --revmin        Minimum overlap length between the read and the linker in 
+    		    forward reads.(default:4)
+
+    -t --trimmomatic
+	            The path to trimmomatic.jar file
+
+    -m --min-len    The minimum required overlap length between two
+                    reads to provide a confident overlap in stitching. (default:
+                    10)
+
+    -M --max-len    Maximum overlap length expected in approximately 90% of 
+       		    read pairs in stitching. (default:222)
+		      
+
+    -x --ref        a fasta file containing reference sequence
+
+    --refdir        the path to the directory that contain the reference sequence file
+
+    -s --siteref    a tab separated file listing methylation site position 
+       		    with one line one region in the following format:
+		    gene1(region1)    position1	position2.....
+		    gene2(region2)    position1 position2.....
+ 		    The first base in target region is position 1.
+
+    --fastqcdir     the path to the directory that contain fastqc command
+
+    --cutadaptdir   the path to the directory that contain cutadapt command
+
+    -h              print this usage message"
+    exit 1
+}
+
+# read the options
+TEMP=`getopt -o i:o:q::f:r:l:t:m::M::x:s:h -l indir:,outdir:,queue::,phred::,forseq:,revseq:,formin::,revmin::,seqlen:,trimmomatic:,min-len::,max-len::,ref:,siteref:,refdir:,fastqcdir:,cutadaptdir: -n 'main' -- "$@"`
+eval set -- "$TEMP"
+
+# extract options and their arguments into variables.
+while true ; do
+    case "$1" in
+        -i|--indir) INDIR=$2 ; shift 2;;
+        -o|--outdir) OUTDIR=$2 ; shift 2 ;;
+	-q|--queue) QUEUE=$2 ; shift 2 ;;
+	--phred) PHRED=$2 ; shift 2;;
+	-f|--forseq) LINFOR=$2 ; shift 2 ;;
+	-r|--revseq) LINREV=$2 ; shift 2 ;;
+	--formin) LINFORMIN=$2 ; shift 2 ;;
+	--revmin) LINREVMIN=$2 ; shift 2 ;;
+	-l|--seqlen) LINLEN=$2 ; shift 2 ;;
+	-t|--trimmomatic) TRIMMOMATIC=$2 ; shift 2 ;;
+	-m|--min-len) MIN=$2 ; shift 2 ;;
+	-M|--max-len) MAX=$2 ; shift 2 ;;
+	-x|--ref) REF=$2 ; shift 2 ;;
+	-s|--siteref) SITEREF=$2 ; shift 2 ;;
+	--refdir) REFDIR=$2 ; shift 2 ;;
+	--fastqcdir) FASTQCDIR=$2 ; shift 2 ;;
+	--cutadaptdir) CUTADAPTDIR=$2 ; shift 2 ;; 
+        -h) usage 0 ;;
+        --) shift ; break ;;
+        *) echo "Option $1 is not a valid option." ; exit 1 ;;
+    esac
+done
+if [ "$INDIR" = "" ]; then
+   echo "ERROR: No argument for option -i|--indir"
+elif [ "$OUTDIR" = "" ]; then
+   echo "ERROR: No argument for option -o|--outdir"
+elif [ "$LINFOR" = "" ]; then
+   echo "ERROR: No argument for option -f|--forseq"
+elif [ "$LINREV" = "" ]; then
+   echo "ERROR: No argument for option -r|--revseq"
+elif [ "$LINLEN" = "" ]; then
+   echo "ERROR: No argument for option -l|--seqlen"
+elif [ "$TRIMMOMATIC" = "" ]; then
+   echo "ERROR: No argument for option -t|--trimmomatic"
+elif [ "$REFDIR" = "" ]; then
+   echo "ERROR: No argument for option --refdir"
+elif [ "$REF" = "" ]; then 
+   echo "ERROR: No argument for option -x|--ref"
+elif [ "$SITEREF" = "" ]; then
+   echo "ERROR: No argument for option -s|--siteref"
+elif [ "$FASTQCDIR" = "" ]; then
+   echo "ERROR: No argument for option --fastqcdir"
+elif [ "$CUTADAPTDIR" = "" ]; then
+   echo "ERROR: No argument for option --cutadaptdir"
+else
+   mkdir ${OUTDIR}/fastqc_raw
+   mkdir ${OUTDIR}/trim
+   mkdir ${OUTDIR}/stitch
+   mkdir ${OUTDIR}/fastqc_stitch
+   mkdir ${OUTDIR}/sam
+   mkdir ${OUTDIR}/sam_indel
+   mkdir ${OUTDIR}/meth_site
+   mkdir ${OUTDIR}/sh
+   cd ${REFDIR}
+   bowtie2-build ${REF} myref
+
+   cd -
+   for file in $(ls ${INDIR}/*.1.fq); do
+       newfile=`basename $file | sed 's/.1.fq//g'`
+       echo ${newfile}
+       commandfile=${OUTDIR}/sh/run_$newfile.sh
+       echo "Commends are written to ${commandfile}"
+       cat >${commandfile}  <<EOF
+echo "check qc ..."
+${FASTQCDIR}/fastqc -o ${OUTDIR}/fastqc_raw ${INDIR}/${newfile}.1.fq
+${FASTQCDIR}/fastqc -o ${OUTDIR}/fastqc_raw ${INDIR}/${newfile}.2.fq
+
+echo "trim sequences..."
+java -jar ${TRIMMOMATIC} PE -phred${PHRED} -trimlog ${OUTDIR}/trim/$newfile.log  ${INDIR}/$newfile.1.fq  ${INDIR}/$newfile.2.fq ${OUTDIR}/trim/$newfile.1.paired.fq ${OUTDIR}/trim/$newfile.1.unpaired.fq ${OUTDIR}/trim/$newfile.2.paired.fq ${OUTDIR}/trim/$newfile.2.unpaired.fq HEADCROP:${LINLEN} TRAILING:20 SLIDINGWINDOW:4:20
+
+${CUTADAPTDIR}/cutadapt -a ${LINFOR} -O ${LINFORMIN} ${OUTDIR}/trim/$newfile.1.paired.fq > ${OUTDIR}/trim/$newfile.1.paired.nolinker.fq
+
+${CUTADAPTDIR}/cutadapt -a ${LINREV} -O ${LINREVMIN} ${OUTDIR}/trim/$newfile.2.paired.fq > ${OUTDIR}/trim/$newfile.2.paired.nolinker.fq
+
+echo "stitch forward and reverse reads..."
+flash -M ${MAX} -m ${MIN} -o ${newfile} -d ${OUTDIR}/stitch ${OUTDIR}/trim/${newfile}.1.paired.nolinker.fq ${OUTDIR}/trim/${newfile}.2.paired.nolinker.fq
+
+echo "check qc after stitching..."
+${FASTQCDIR}/fastqc -o ${OUTDIR}/fastqc_stitch ${OUTDIR}/stitch/${newfile}.extendedFrags.fastq
+
+echo "aligning..."
+export BOWTIE2_INDEXES=${REFDIR}
+bowtie2 --phred${PHRED} --np 0 --no-unal --local --no-head -x myref -U ${OUTDIR}/stitch/${newfile}.extendedFrags.fastq -S ${OUTDIR}/sam/${newfile}.sam
+
+echo "pick up CpG sites..."
+indel.py ${OUTDIR}/sam/${newfile}.sam ${OUTDIR}/sam_indel/${newfile}.site
+methsite.py ${SITEREF} ${OUTDIR}/sam_indel/${newfile}.site ${OUTDIR}/meth_site/${newfile}.site
+
+EOF
+
+   ${QUEUE}  bash ${commandfile}
+   done
+fi
+
+
+
+

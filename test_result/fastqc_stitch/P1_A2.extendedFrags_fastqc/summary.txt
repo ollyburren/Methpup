@@ -1,0 +1,11 @@
+PASS	Basic Statistics	P1_A2.extendedFrags.fastq
+FAIL	Per base sequence quality	P1_A2.extendedFrags.fastq
+PASS	Per sequence quality scores	P1_A2.extendedFrags.fastq
+FAIL	Per base sequence content	P1_A2.extendedFrags.fastq
+FAIL	Per base GC content	P1_A2.extendedFrags.fastq
+FAIL	Per sequence GC content	P1_A2.extendedFrags.fastq
+PASS	Per base N content	P1_A2.extendedFrags.fastq
+WARN	Sequence Length Distribution	P1_A2.extendedFrags.fastq
+FAIL	Sequence Duplication Levels	P1_A2.extendedFrags.fastq
+FAIL	Overrepresented sequences	P1_A2.extendedFrags.fastq
+FAIL	Kmer Content	P1_A2.extendedFrags.fastq

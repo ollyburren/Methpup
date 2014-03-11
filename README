@@ -1,0 +1,107 @@
+Methpup (METHylation site Picking Up Pipeline) is a pipeline to pick up methylation sites from bisulphite sequnceing reads with known methylation site positions. It takes the raw pair-end Bi-seq data as input, does some quality control and aligns reads to targeted regions using the ultra high-throughput short read aligner Bowtie2, and then analyzes the mapping results, adjusts the reads with insertion/deletion and pick up the methylation sites.
+
+This software is developed by Xin Yang (xin.yang@cimr.cam.ac.uk) in Juvenile Diabetes Research Foundation/Wellcome Trust Diabetes and Inflammation Laboratory (JDRF/WT DIL). A paper describing this software is in preparing for Genome Biolofy software.
+
+
+===================== 
+Pre-requirement:
+=====================
+
+1) Install fastqc (http://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and set the option --fastqcdir to your path to fastqc directory. 
+2) Install trimmomatic (http://www.usadellab.org/cms/?page=trimmomatic) and set the option --trimmomatic to your path to trimomatic.jar file.
+3) Install cutadapt (https://code.google.com/p/cutadapt/) and set the option --cutadapt to your path to your cutadapt/bin directory.
+4) flash (http://ccb.jhu.edu/software/FLASH/) and put it in your $PATH.
+5) Install bowtie2 (http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and put it in your $PATH.
+6) Python and java are needed to support this software.
+7) Copy indel.py and methsite.py under this directory to your $PATH.
+
+====================
+Synopsis
+====================
+
+./Methpup -i input -o output -c shdir -f linkseq1 -r linkseq2 -l linklen -t path/to/trimmomatic.jar --refdir=/your-path-to-ref-directory/ -x ref -s siteref --fastqcdir=/your-path-to-fastqc/ --cutadaptdir=/your-path-to-cutadapt/ [--queue=/your-queue-file/] [--phred=33] [--formin=5] [--revmin=4] [-m10] [-M222]
+
+====================
+Description
+====================
+
+The options for the program as as follows:
+    
+    -i --indir      The directory saves all input raw fastq files.
+    
+    -o --outdir     Create all output files in the specified output directory.
+                    Please note that this directory must exist as the program
+                    will not create it.
+ 
+    -q --queue	    Customized bash files to submit parallele jobs in q. If 
+       		    not supplied, the jobs would run locally in current terminal.
+		    
+    --phred         Input qualities are ASCII chars equal to the Phred quality 
+                    plus 33 (by default). This is also called the "Phred+33" encoding,
+                    which is used by the very latest Illumina pipelines.
+
+    -f --forseq     The linker sequence that links barcode/adapter and target region in
+       		    the 5'end.
+
+    -r --revseq     The linker sequence that links target region and adapter in
+       		    the 3'end.
+
+    -l --seqlen     The length of the linker sequence
+
+    --formin        Minimum overlap length between the read and the linker in 
+    		    forward reads. If the overlap is shorter than LENGTH, the
+		    read is not modified. This reduces the number of bases 
+		    trimmed purely due to short random adapter matches (default:
+                    5)
+    --revmin        Minimum overlap length between the read and the linker in 
+    		    forward reads.(default:4)
+
+    -t --trimmomatic
+	            The path to trimmomatic.jar file
+
+    -m --min-len    The minimum required overlap length between two
+                    reads to provide a confident overlap in stitching. (default:
+                    10)
+
+    -M --max-len    Maximum overlap length expected in approximately 90% of 
+       		    read pairs in stitching. (default:222)
+		      
+
+    -x --ref        a fasta file containing reference sequence
+
+    --refdir        the path to the directory that contain the reference sequence file
+
+    -s --siteref    a tab separated file listing methylation site position 
+       		    with one line one region in the following format:
+		    gene1(region1)    position1	position2.....
+		    gene2(region2)    position1 position2.....
+ 		    The first base in target region is position 1.
+
+    --fastqcdir     the path to the directory that contain fastqc command
+
+    --cutadaptdir   the path to the directory that contain cutadapt command
+
+    -h              print this usage page
+
+
+====================
+Test
+===================
+
+There are several pair-end raw read files under test directory. The output results of this software are saved under test_result directory. To generate this result, you could try this command under the current directory in bash:
+
+./Methpup -i test -o test_result -f GGTCATAGCTGTTTCCTG -r ACTGGCCGTCGTTTTACA -l 18 -t /path-to-trimmomatic.jar/ --refdir=test_result/ref -x myref.fa -s test_result/total_CpG_sites.txt --fastqcdir=/path-to-fastqc/ --cutadaptdir=/path-to-cutadapt/
+
+
+====================
+BUGS
+====================
+Any bugs in Methpup should be reported to xin.yang@cimr.cam.ac.uk
+
+
+====================
+Acknowledgement
+====================
+I'd like to thank Dr Chris Wallace for her supervision on this work.
+
+

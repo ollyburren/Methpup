@@ -1,0 +1,11 @@
+PASS	Basic Statistics	P1_A2.2.fq
+PASS	Per base sequence quality	P1_A2.2.fq
+PASS	Per sequence quality scores	P1_A2.2.fq
+FAIL	Per base sequence content	P1_A2.2.fq
+FAIL	Per base GC content	P1_A2.2.fq
+FAIL	Per sequence GC content	P1_A2.2.fq
+PASS	Per base N content	P1_A2.2.fq
+WARN	Sequence Length Distribution	P1_A2.2.fq
+FAIL	Sequence Duplication Levels	P1_A2.2.fq
+FAIL	Overrepresented sequences	P1_A2.2.fq
+FAIL	Kmer Content	P1_A2.2.fq

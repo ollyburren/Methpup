@@ -19,7 +19,7 @@ Pre-requirement:
 Synopsis
 ====================
 
-./Methpup -i input -o output -c shdir -f linkseq1 -r linkseq2 -l linklen -t path/to/trimmomatic.jar --refdir=/your-path-to-ref-directory/ -x ref -s siteref --fastqcdir=/your-path-to-fastqc/ --cutadaptdir=/your-path-to-cutadapt/ [--queue=/your-queue-file/] [--phred=33] [--formin=5] [--revmin=4] [-m10] [-M222]
+./Methpup -i input -o output -f linkseq1 -r linkseq2 -l linklen -t path/to/trimmomatic.jar --refdir=/your-path-to-ref-directory/ -x ref -s siteref --fastqcdir=/your-path-to-fastqc/ --cutadaptdir=/your-path-to-cutadapt/ [--queue=/your-queue-file/] [--phred=33] [--formin=5] [--revmin=4] [-m10] [-M222]
 
 ====================
 Description

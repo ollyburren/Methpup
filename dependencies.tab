@@ -1,0 +1,6 @@
+parameter	name	version	url
+novobc_bin	Novobarcode	V3.02.04	http://www.novocraft.com
+cutadapt_bin	Cutadapt	1.4.2	https://code.google.com/p/cutadapt/
+trimmo_jar	Trimmomatic	0.3	http://www.usadellab.org/cms/?page=trimmomatic
+flash_bin	FLASH	1.2.7	http://ccb.jhu.edu/software/FLASH/
+bowtie_bin	Bowtie	1.0.1	https://github.com/BenLangmead/bowtie

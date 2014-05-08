@@ -81,7 +81,7 @@ sub subdir{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/".$SUBDIR_NAME."/ already exists and contains files. Would you like to skip this step ";
 }
 
 sub run_conditions{

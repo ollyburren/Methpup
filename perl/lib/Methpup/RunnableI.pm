@@ -268,6 +268,8 @@ sub skip_ask{
 		return yesno($self->_skip_message);
 	}
 }
+	
+	
 
 
 		

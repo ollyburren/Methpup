@@ -59,13 +59,22 @@ sub run{
 	## next step is rename all the dirs in the target dir with wells
 	my $lu = $self->_get_dlu();
 	opendir (DIR, $odir) or die $!;
-	my @ofile=(basename($self->inputs->{forward_file}),basename($self->inputs->{reverse_file}));
+	#my @ofile=(basename($self->inputs->{forward_file}),basename($self->inputs->{reverse_file}));
 	foreach my $d(grep{-d "$odir/$_"}readdir(DIR)){
 		next if $d =~/^\./;
 		if(my $dest = $lu->{$d}){
 			delete $lu->{$d};
 			`mv $odir/$d $odir/$dest`;
 			$self->verbose("mv $odir/$d $odir/$dest");
+			## next we move individual files to somewhere more sensible
+			my $fwd_file = basename($self->{inputs}->{forward_file});
+			my $rev_file = basename($self->{inputs}->{reverse_file});
+			my $fwd_des_file = "$dest.fwd.fq.gz";
+			my $rev_des_file = "$dest.rev.fq.gz";
+			`mv $odir/$dest/$fwd_file $odir/$dest/$fwd_des_file`;
+			$self->verbose("mv $odir/$dest/$fwd_file $odir/$dest/$fwd_des_file");
+			`mv $odir/$dest/$rev_file $odir/$dest/$rev_des_file`;
+			$self->verbose("mv $odir/$dest/$rev_file $odir/$dest/$rev_des_file");
 		}else{
 			$self->msg("Barcode $d not found in ".$self->inputs->{tag_file});
 		}
@@ -92,12 +101,13 @@ sub demux_filelist{
 	#	return $self->outputs->{demux_filelist};
 	#}
 	my $odir = $self->inputs->{out_dir};
-	my $ffile = basename($self->inputs->{forward_file});
-	my $rfile = basename($self->inputs->{reverse_file});
+	#my $ffile = basename($self->inputs->{forward_file});
+	#my $rfile = basename($self->inputs->{reverse_file});
 	my $lu = $self->_get_dlu();
 	my %ret;
 	foreach my $v(values(%$lu)){
-		my @fs=("$odir/$v/$ffile","$odir/$v/$rfile");
+		#my @fs=("$odir/$v/$ffile","$odir/$v/$rfile");
+		my @fs=("$odir/$v/$v.fwd.fq.gz","$odir/$v/$v.rev.fq.gz");
 		foreach my $tf(@fs){
 			$self->msg("[WARNING] missing expected file $tf - skipping barcode") if(!-e $tf && !$hidewarning);
 			## we skip this 
@@ -129,7 +139,7 @@ sub _get_dlu{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/pipeline/ already exists and contains files. Would you like to skip this step ";
 }
 
 sub run_conditions{
@@ -139,7 +149,7 @@ sub run_conditions{
 	my $flag=0;
 	if(-d $odir){
 		opendir (DIR, $odir) or die $!;
-		if(scalar(grep{-d "$odir/$_"}readdir(DIR))>0){
+		if(scalar(grep{-d "$odir/$_" && $_ !~/^[\.]+/}readdir(DIR))>0){
 			$flag=1;
 		}
 		closedir(DIR);

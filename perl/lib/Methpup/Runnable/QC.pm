@@ -1,4 +1,4 @@
-package Methpup::Runnable::Trimmomatic;
+package Methpup::Runnable::Reports;
 
 use strict;
 use base('Methpup::RunnableI');
@@ -13,14 +13,10 @@ my $JAVA_JAR = 'java -jar';
 my $SUBDIR_NAME = 'trim';
 
 use constant _inputs_expected => {
-	linker_length=>'number',
-	phred=>'number',
-	pe_file_list=>'hashref'
+	working_dir=>'file',
+	steps=>'array'
 };
 
-use constant _defaults => {
-	ops=>'TRAILING:20 SLIDINGWINDOW:4:20'
-};
 	
 sub run{
 	my $self=shift;
@@ -41,7 +37,7 @@ sub run{
 		push @params, "-phred".$self->inputs->{phred};
 		push @params, "-trimlog ${dname}${pef}_trimmomatic.log";
 		push @params, join(" ",@files);
-		push @params, join(" ",map{s/\.(fq|fastq)\.gz$//;"${dname}$_.fq.gz ${dname}${_}.unpaired.fq.gz"}map{basename($_)}@files);
+		push @params, join(" ",map{s/\.fq\.gz$//;"${dname}$_.fq.gz ${dname}${_}.unpaired.fq.gz"}map{basename($_)}@files);
 		push @params, 'HEADCROP:'.$self->inputs->{linker_length}.' '.$self->inputs->{ops};
 		my $cmd = join(" ",$JAVA_JAR,$self->binary,@params);
 		$self->verbose($cmd);
@@ -52,6 +48,8 @@ sub run{
 	}
 	return 1;
 }
+
+
 
 sub subdir{
 	return $SUBDIR_NAME;
@@ -66,7 +64,7 @@ sub trim_filelist{
 	my %pe_list = %{$self->inputs->{pe_file_list}};
 	my %ret;
 	foreach my $pef(keys(%pe_list)){
-		my @files = map{s/\.(fq|fastq)\.gz$/.fq.gz/;dirname($_)."/trim/".basename($_)}@{$pe_list{$pef}};
+		my @files = map{dirname($_)."/trim/".basename($_)}@{$pe_list{$pef}};
 		if(scalar(grep{-e $_}@files)==2){
 			$ret{$pef}=\@files;
 		}elsif(-d $self->log_dir){
@@ -80,7 +78,7 @@ sub trim_filelist{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/".$SUBDIR_NAME."/ already exists and contains files. Would you like to skip this step ";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
 }
 
 sub run_conditions{

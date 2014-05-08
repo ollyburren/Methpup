@@ -38,6 +38,7 @@ sub run{
 		my @params = '-a '.$self->inputs->{forseq};
 		push @params, '-O '.$self->inputs->{linformin};
 		push @params, $files[0];
+		push @params, '| gzip -';
 		push @params, " > $dname/".basename($files[0]);
 		my $cmd = join(" ",$self->binary,@params);
 		$self->verbose($cmd);
@@ -46,6 +47,7 @@ sub run{
 		@params = '-a '.$self->inputs->{revseq};
 		push @params,  '-O '.$self->inputs->{linrevmin};
 		push @params, $files[1];
+		push @params, '| gzip -';
 		push @params, " > $dname/".basename($files[1]);
 		$cmd = join(" ",$self->binary,@params);
 		$self->verbose($cmd);
@@ -89,7 +91,7 @@ sub subdir{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/".$SUBDIR_NAME."/ already exists and contains files. Would you like to skip this step ";
 }
 
 sub run_conditions{

@@ -13,6 +13,7 @@ my $SUBDIR_NAME = 'methylation_sites';
 
 use constant _inputs_expected => {
 	meth_site_file=>'file',
+	genomic_fa_file=>'file',
 	samfiles=>'hashref',
 	bowtie_sub=>'string',
 };
@@ -38,6 +39,8 @@ sub run{
 		my @params = "-s $file";
 		push @params,"-o $dname";
 		push @params,"-m ".$self->inputs->{meth_site_file};
+		push @params,"-g ".$self->inputs->{genomic_fa_file};
+		push @params,"-i $s";
 		my $cmd = join(" ",'perl',$self->binary,@params);
 		$self->verbose($cmd);
 		$self->step->add_job(Macd::Step::Job->new(command=>$cmd));
@@ -58,17 +61,18 @@ sub filelist{
 	my $subdir = $self->inputs->{bowtie_sub};
 	my %ret;
 	foreach my $s(keys(%samfiles)){
-		(my $fpattern = basename($samfiles{$s})) =~s/\.sam$/*/;
+		#(my $fpattern = basename($samfiles{$s})) =~s/\.sam.gz$/*/;
+		(my $fpattern = basename($samfiles{$s})) =~s/^([^\.]+)\..*$/\1*/;
 		#$fpattern.='.extendedFrags.fastq.gz';
 		(my $dname=dirname($samfiles{$s}))=~s/$subdir$/$SUBDIR_NAME/;
 		next unless -d $dname;
 		opendir(DIR,$dname) || die "Cannot open $dname\n";
 		my @files = grep{/$fpattern/}readdir(DIR);
 		foreach my $f(@files){
-			if(-e $f){
-				push @{$ret{$s}},$f;
+			if(-e $dname."/".$f){
+				push @{$ret{$s}},$dname.'/'.$f;
 			}elsif(-d $self->log_dir){
-				$self->msg("[WARNING] missing expected file ".$fpattern." - skipping further analysis") unless $hidewarning;
+				$self->msg("[WARNING] missing expected file ".$f." - skipping further analysis") unless $hidewarning;
 			}
 		}
 	}
@@ -83,7 +87,7 @@ sub subdir{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/".$SUBDIR_NAME."/ already exists and contains files. Would you like to skip this step ";
 }
 
 sub run_conditions{

@@ -5,32 +5,43 @@ use Getopt::Long;
 use Data::Dumper;
 use File::Basename qw/basename/;
 
+my $EFFICIENCY_THRESHOLD=95;
+## skip bisulphite failures where efficiency is 0% and NO_CALLS is less than 10;
+my $NO_CALL_CUTOFF=20;
+my $DEFAULT_ID='UNK';
+
 ######################
 ## ARGUMENT HANDLING #
 ######################
 
 my $USAGE=<<EOL;
-perl $0 -[s]amfile -[m]eth_file -[o]utdir {-v[erbose] -r[elaxed] -[a]lign_fasta}
+perl $0 -[s]amfile -[m]eth_file -[o]utdir -[g]enomic_fasta {-v[erbose] -r[elaxed] -[a]lign_fasta -[e]ff_thresh -[i]d}
 
 	samfile - path to input SAM formatted file (output from bowtie2)
+	genomic_fasta - path to a FASTA formatted sequences of genomic DNA (prior to bisulphite conversion) - use to compute bisulphite efficiency
+	eff_thresh - Bisulphite efficiency threshold (\%), default $EFFICIENCY_THRESHOLD\%
 	align_fasta - path to FASTA formatted sequences used to run bowtie step - NOT CURRENTLY IMPLEMENTED.
 	meth_file - path to tab delim file for locations of meth site for each insert.
 	relaxed - boolean, if set to 0 then reads w/o C/T at methsite will be output
 	outdir - path to write out results
+	id - optional identifier used in reporting files defaults to $DEFAULT_ID
 	
 Original algorithm Xin Yang, converted to Perl by Olly Burren
 EOL
 
-my($sam,$out,$meth,$help,$verbose,$fasta,$relaxed);
+my($sam,$out,$meth,$help,$verbose,$fasta,$relaxed,$gfa_file,$e_thresh,$id);
 
 GetOptions (
 	'samfile|s=s' => \$sam,
+	'genomic_fasta|g=s' => \$gfa_file,
 	'outdir|o=s' => \$out,
 	'methfile|m=s' => \$meth,
 	'align_fasta|a=s'=>\$fasta,
 	'help|h' => \$help,
 	'relaxed|r'=> \$relaxed,
-	'verbose|v' => \$verbose
+	'verbose|v' => \$verbose,
+	'eff_thresh|e=i' => \$e_thresh,
+	'id|i=s' => \$id
 	);
 
 my $ERROR_FLAG;
@@ -55,6 +66,11 @@ if(!$meth){
 	$ERROR_FLAG++;
 }
 
+if(!$gfa_file){
+	print STDERR "[ERROR] -[g]enomic_fasta parameter required\n";
+	$ERROR_FLAG++;
+}
+
 unless(-e $sam){
 	print STDERR "[ERROR] cannot locate samfile $sam\n";
 	$ERROR_FLAG++;
@@ -65,6 +81,14 @@ unless(-e $meth){
 	$ERROR_FLAG++;
 }
 
+unless(-e $gfa_file){
+	print STDERR "[ERROR] cannot locate genomic_fasta $gfa_file\n";
+	$ERROR_FLAG++;
+}
+
+$e_thresh||=$EFFICIENCY_THRESHOLD;
+
+$id||=$DEFAULT_ID;
 
 #unless(-e $fasta){
 #	print STDERR "[ERROR] cannot locate align_fasta $fasta\n";
@@ -83,20 +107,29 @@ if($ERROR_FLAG){
 #########
 ## MAIN #
 #########
-(my $stub = basename($sam)) =~s/\.sam$//;
+#stub is every thing up to the first full stop
+#(my $stub = basename($sam)) =~s/\.sam$//;
+(my $stub = basename($sam)) =~s/^([^\.]+)\..*$/\1/;
 
 my $meths = &read_meth_sites($meth);
 #my $sequences = &read_align_fasta($fasta,$meths);
 
+if($sam=~m/\.gz$/){
+	open(SAM, "gzip -dc $sam |") ||   die "Cannot open SAM file for reading $sam\n";
+}else{
+	open(SAM,$sam) || die "Cannot open SAM file for reading $sam\n";
+}
 
-open(SAM,$sam) || die "Cannot open SAM file for reading $sam\n";
 my %RHASH;
 while(<SAM>){
 	chomp;
+	next if /^@/;
 	my $res = &process_indel($_);
 	my ($g,$lm,$s,$l)=@$res;
 	$RHASH{$g}{$s}{$lm}++;
 }
+
+#die Dumper(keys %RHASH);
 
 my %CALLS;
 my %EFF;
@@ -121,12 +154,15 @@ foreach my $g(keys %RHASH){
 open(MP,">$out/$stub.methplot") || die "Cannot open $out/$stub.methplot for writing\n";
 foreach my $g(keys %CALLS){
 	foreach my $s(keys %{$CALLS{$g}}){
-		for(my $i;$i<$CALLS{$g}{$s};$i++){
-			last if $s eq 'NOCALL';
+		next if $s eq 'NOCALL';
+		my $sum = $CALLS{$g}{$s};
+		print MP "$g\t$s\t$sum\t$id\n";
+		#for(my $i;$i<$CALLS{$g}{$s};$i++){
+			#last if $s eq 'NOCALL';
 			## note that we do not filter results 
 			## that are not C or T
-			print MP join("\t",$g,$s)."\n";
-		}
+			#print MP join("\t",$g,$s)."\n";
+		#}
 	}
 }
 close(MP);
@@ -137,8 +173,8 @@ close(MP);
 my $c_to_t = &c_to_t(\%CALLS,$meths);
 
 foreach my $k(keys%{$c_to_t}){
-	my @header='gene';
-	my @value=$k;
+	my @header=('gene','well');
+	my @value=($k,$id);
 	foreach my $r(@{$c_to_t->{$k}}){
 		push @header,$r->{name};
 		push @value,$r->{count};
@@ -147,6 +183,74 @@ foreach my $k(keys%{$c_to_t}){
 	print CTOT join("\t",@header)."\n".join("\t",@value)."\n";
 	close(CTOT)
 }
+
+## code to compute bisulphite efficiency
+
+my $bsites=&read_bis_sites($gfa_file,$meths);
+
+my %EFF;
+foreach my $g(keys %RHASH){
+	if(!$bsites->{$g}){
+		print "WARNING bisulphite sites not defined for $g: SKIPPING\n";
+		next;
+	}
+	#next unless $g eq 'foxp3';
+	foreach my $s(keys %{$RHASH{$g}}){
+		foreach my $lm(keys %{$RHASH{$g}{$s}}){
+			my $count = $RHASH{$g}{$s}{$lm};
+			my $cm = &call_meth($g,$lm,$s,$count,$bsites,$relaxed);
+			$EFF{$g}{$cm->[1]}+=$cm->[2];
+			last;
+		}
+	}
+}
+
+my ($cs,$ts,$nc,$total);
+open(EFF,">$out/${stub}.efficiency") || die "Cannot open  >$out/${stub}.efficiency for writing\n";
+open(EFFM,">$out/${stub}.efficiency.methplot") || die "Cannot open  >$out/${stub}.efficiency for writing\n";
+foreach my $g(keys %EFF){
+	## grab the total # of sites.
+	my $total_sites=scalar(@{$bsites->{$g}});
+	foreach my $s(keys %{$EFF{$g}}){
+		my $c =()= $s =~ /C/g;
+		my $t =()= $s =~ /T/g;
+		my $sum = $EFF{$g}{$s};
+		if($s ne 'NOCALL'){	
+			print EFFM "$g\t$s\t$sum\t$id\n";
+			#for(my $i=0;$i<$EFF{$g}{$s};$i++){
+			#	print EFFM "$g\t$s\t$id\n";
+			#}
+			#$cs+=($c*$EFF{$g}{$s});
+			$ts+=($t*$sum);
+			$total+=(($c+$t)*$sum);
+		}else{
+			$nc+=$sum;
+		}
+		#$total+=($total_sites*$EFF{$g}{$s});
+	}
+	my $eff;
+	## this happens when we get none of a product called.
+	if($ts==0){
+		## will get a lot of spurious failures so here we skip if 
+		## NOCALLS is less than 10 as these are likely artefactual.
+		next if $nc<$NO_CALL_CUTOFF;
+		$eff=0;
+	}else{
+		#$eff = 100-(($cs/$ts)*100);
+		$eff = (($ts/$total)*100);
+	}
+	printf EFF "%s\t%s\t%.1f\t%d\t%d\n",$id,$g,$eff,$nc,$total;
+	#if($eff < $EFFICIENCY_THRESHOLD){
+	#	printf EFF "%s\t%.2f%\t%d\n",$id,$g,$eff,$nc;
+	#}else{
+	#	open(EFF,">$out/${stub}.$g.pass.tab") || die "Cannot open  >$out/${stub}.$g.pass.tab for writing\n";
+	#	printf EFF "PASS:%s:%.2f%, NOCALLS:%d\n",$g,$eff,$nc;
+	#	close(EFF);
+	#}
+}
+close(EFF);
+close(EFFM);
+
 
 ## some messing around to generate PWM's for
 ## use is seqLogo's
@@ -160,6 +264,9 @@ foreach my $k(keys%{$c_to_t}){
 
 ## print $foobar;
 
+################
+## END OF MAIN #
+################
 
 ###############
 # SUBROUTINES #
@@ -290,8 +397,11 @@ sub read_meth_sites{
 	my %METHS;
 	while(<METH>){
 		chomp;
-		my @vals = grep{/\d+/}split("\t",$_);
-		$METHS{$vals[0]}=[@vals[1..$#vals]];
+		## incase in dos format
+		s/\r//g;
+		my ($name,@tmp) = split("\t",$_);
+		my @vals =  grep{/\d+/}@tmp;
+		$METHS{$name}=\@vals;
 	}
 	close(METH);
 	return \%METHS;
@@ -387,6 +497,61 @@ sub cumsum{
 		push @tmp,$prev+$array[$i];
 	}
 	return @tmp;
+}
+
+## code reads in genomic FASTA and computes bisulphite conversion coords
+## removes CpG's already defined.
+## Code removes any sites within the first 5 bp as these may have been trimmed
+## prior to calling. Likewise any sites after the last CpG are also removed.
+## So whilst giving a good estimate of efficiency depending on the construct
+## there could be a degree of error.
+
+sub read_bis_sites{
+	my ($fa_file,$meths)=@_;
+	open(FA,$fa_file) || die "Cannot open $fa_file\n";
+	my %FA;
+	my ($g,$s);
+	while(<FA>){
+		chomp;
+		if(m/>(.*)/){
+			if($s){
+				($FA{$g}=$s)=~s/\s+//g;
+			}
+			$g=$1;
+			$s='';
+		}else{
+			$s.=$_;
+		}
+	}
+	($FA{$g}=$s)=~s/\s+//g;
+	##convert into positions
+	foreach my $g(keys %FA){
+		my $marray = $meths->{$g};
+		unless(ref($marray) eq 'ARRAY'){
+			die "Cannot find gene '$g' in methylation definition file\n";
+		}
+		my %lu;
+		foreach my $p(@$marray){
+			$lu{$p}++;
+		}
+		my $max_pos = $marray->[-1];
+		my @s=split('',$FA{$g});
+		my @pos;
+		for(my $i=0;$i<@s;$i++){
+			last if $i>($max_pos-1);
+			next unless $s[$i] eq 'C';
+			if($s[$i+1] eq 'G'){
+				die "$g:Should have a methsite at position ".($i+1)." please check!\n" unless $lu{$i+1};
+				#push @pos,($i+1).'*';
+			}else{
+				## don't count sites in the first 5 bp as downstream trimming
+				## removes a variable amount of gene specific primer anyways.
+				push @pos,$i+1 unless $i <5;
+			}
+		}
+		$FA{$g}=\@pos;
+	}
+	return \%FA;
 }
 			
 			

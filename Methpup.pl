@@ -190,6 +190,8 @@ my $TAGFILE = $PROJECT{novobarcode_index_file};
 
 my $odir = "$PROJECT_DIR/pipeline/";
 
+my %STEPS;
+
 my $demux = Methpup::Runnable::DeMultiplex->new(
 		log_dir=>"$PROJECT_DIR/log/demultiplex/",
 		binary=>$PROGRAMS{novobc_bin},
@@ -208,6 +210,11 @@ my $demux = Methpup::Runnable::DeMultiplex->new(
 		}
 )->run_step;
 
+$STEPS{'DeMultiplex'}={
+	obj=>$demux,
+	order=>1
+};
+													
 
 ################
 ## TRIMMOMATIC #
@@ -218,6 +225,7 @@ my $trimmo = Methpup::Runnable::Trimmomatic->new(
 	binary=>$PROGRAMS{trimmo_jar},
 	debug_flag=>1,          
 	macd_driver=>$DRIVER,
+	previous_step=>$demux,
 	inputs=>{
 		linker_length=>$PROJECT{linker_length},### SORT THIS OUT LATER
 		phred=>$PROJECT{phred},
@@ -226,7 +234,13 @@ my $trimmo = Methpup::Runnable::Trimmomatic->new(
 	outputs=>{
 		out_dir=>$odir
 	})->run_step;
-#die Dumper($trimmo);
+
+
+$STEPS{'Trimmomatic'}={
+	obj=>$trimmo,
+	order=>2
+};
+
 #############
 ## CUTADAPT #
 #############
@@ -237,6 +251,7 @@ my $cutadapt = Methpup::Runnable::Cutadapt->new(
 	binary=>$PROGRAMS{cutadapt_bin},
 	debug_flag=>1,          
 	macd_driver=>$DRIVER,
+	previous_step=>$trimmo,
 	inputs=>{
 		forseq=>$PROJECT{forseq},
 		revseq=>$PROJECT{revseq},
@@ -248,7 +263,13 @@ my $cutadapt = Methpup::Runnable::Cutadapt->new(
 	outputs=>{
 		out_dir=>$odir
 	})->run_step;
-#die(Dumper($cutadapt));
+
+$STEPS{'Cutadapt'}={
+	obj=>$cutadapt,
+	order=>3
+};
+
+
 ##########
 ## FLASH #
 ##########
@@ -258,6 +279,7 @@ my $flash = Methpup::Runnable::FLASH->new(
 	binary=>$PROGRAMS{flash_bin},
 	debug_flag=>1,          
 	macd_driver=>$DRIVER,
+	previous_step=>$cutadapt,
 	inputs=>{
 		maxol=>$PROJECT{maxol},
 		minol=>$PROJECT{minol},
@@ -268,6 +290,11 @@ my $flash = Methpup::Runnable::FLASH->new(
 		out_dir=>$odir
 	})->run_step;
 
+$STEPS{'FLASH'}={
+	obj=>$flash,
+	order=>4
+};
+
 ###########
 ## BOWTIE #
 ###########
@@ -277,18 +304,26 @@ my $bowtie = Methpup::Runnable::Bowtie->new(
 	binary=>$PROGRAMS{bowtie_bin},
 	debug_flag=>1,          
 	macd_driver=>$DRIVER,
+	previous_step=>$flash,
 	inputs=>{
 		index_dir=>"$PROJECT_DIR/bowtie2_index/",
 		ref_seq_file=>$PROJECT{'ref_seq_file'},
 		phred=>$PROJECT{phred},
 		flash_sub=>$flash->subdir,
-		pe_file_list=>$flash->filelist('hidewarning')
+		pe_file_list=>$flash->filelist('hidewarning'),
 	},
 	outputs=>{
 		out_dir=>$odir
 	})->run_step;
 
-sleep(5);
+$STEPS{'Bowtie'}={
+	obj=>$bowtie,
+	order=>5
+};
+
+#die Dumper ($bowtie->filelist());
+
+#sleep(5);
 
 
 ###########################
@@ -300,11 +335,64 @@ my $cm = Methpup::Runnable::CallMeth->new(
 	binary=>"$Bin/perl/call_methsites_from_sam.pl",
 	debug_flag=>1,          
 	macd_driver=>$DRIVER,
+	previous_step=>$bowtie,
 	inputs=>{
 		meth_site_file=>$PROJECT{meth_site_file},
+		genomic_fa_file=>$PROJECT{genomic_fa_file},
 		bowtie_sub=>$bowtie->subdir,
 		samfiles=>$bowtie->filelist('hidewarning')
 	},
 	outputs=>{
 		out_dir=>$odir
 	})->run_step;
+
+#die Dumper($cm->filelist());
+
+$STEPS{'CallMeth'}={
+	obj=>$cm,
+	order=>6
+};
+
+##############
+## METHPLOT ##
+##############
+
+my $mp = Methpup::Runnable::Methplot->new(
+	log_dir=>"$PROJECT_DIR/log/methplot/",
+	binary=>"/usr/bin/Rscript",
+	env_settings=>"R_LIBS=$ENV{R_LIBS}",
+	debug_flag=>1,          
+	macd_driver=>$DRIVER,
+	previous_step=>$cm,
+	inputs=>{
+		in_dir=>"$PROJECT_DIR/pipeline/",
+		out_dir=>"$PROJECT_DIR/methplot/",
+		script=>"$Bin/R/methplot.mp.R"
+	},
+	outputs=>{
+		out_dir=>"$PROJECT_DIR/methplot/"
+	})->run_step;
+
+
+
+
+##################
+## REPORTING ETC #
+##################
+
+my $cm = Methpup::Runnable::Reports->new(
+	log_dir=>"$PROJECT_DIR/log/reports/",
+	binary=>"$Bin/perl/methpup_report.pl",
+	debug_flag=>1,          
+	macd_driver=>$DRIVER,
+	previous_step=>$bowtie,
+	inputs=>{
+		callmeth_sub=>$cm->subdir,
+		cm_files=>$cm->filelist('hidewarning')
+	},
+	outputs=>{
+		out_dir=>$odir
+	})->run_step;
+
+
+

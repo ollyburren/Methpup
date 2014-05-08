@@ -16,11 +16,11 @@ use constant _inputs_expected => {
 	pe_file_list=>'hashref',
 	flash_sub=>'string',
 	phred=>'number',
-	
 };
 
 use constant _defaults => {
-	ops=>'--np 0 --no-unal --local --no-head'
+	#ops=>'--np 0 --no-unal --local --no-head'
+	ops=>'--np 0 --no-unal --local'
 };
 	
 sub run{
@@ -54,7 +54,7 @@ sub run{
 		push @params, $self->inputs->{ops};
 		push @params, '-x '.$self->inputs->{index_dir};
 		push @params, '-U '.$file;
-		push @params, "-S  $dname/$fpattern.sam";
+		push @params, "-S  $dname/$fpattern.sam ; gzip $dname/$fpattern.sam";
 		my $cmd = join(" ",$self->binary,@params);
 		$self->verbose($cmd);
 		$self->step->add_job(Macd::Step::Job->new(command=>$cmd));
@@ -75,7 +75,7 @@ sub filelist{
 	my $subdir = $self->inputs->{flash_sub};
 	my %ret;
 	foreach my $pef(keys(%pe_list)){
-		(my $fpattern = basename($pe_list{$pef})) =~s/\.fastq.gz$/.sam/;
+		(my $fpattern = basename($pe_list{$pef})) =~s/\.fastq.gz$/.sam.gz/;
 		#$fpattern.='.extendedFrags.fastq.gz';
 		(my $dname=dirname($pe_list{$pef}))=~s/$subdir$/$SUBDIR_NAME/;
 		$fpattern="$dname/$fpattern";
@@ -96,7 +96,7 @@ sub subdir{
 
 sub _skip_message{
 	my $self=shift;
-	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}." already exists and contains files. Would you like to skip this step ?";
+	return "[".ref($self)."]: The output path ".$self->inputs->{out_dir}."/".$SUBDIR_NAME."/ already exists and contains files. Would you like to skip this step ";
 }
 
 sub run_conditions{

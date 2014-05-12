@@ -1,5 +1,7 @@
 Methpup (METHylation site Picking Up Pipeline) is a pipeline to pick up methylation sites from bisulphite sequnceing reads with known methylation site positions. It takes the raw pair-end Bi-seq data as input, does some quality control and aligns reads to targeted regions using the ultra high-throughput short read aligner Bowtie2, and then analyzes the mapping results, adjusts the reads with insertion/deletion and pick up the methylation sites.
 
+For instructions on using the perl implementation of this software please see README.perl file.
+
 This software is developed by Xin Yang (xin.yang@cimr.cam.ac.uk) in Juvenile Diabetes Research Foundation/Wellcome Trust Diabetes and Inflammation Laboratory (JDRF/WT DIL). A paper describing this software is in preparing for Genome Biolofy software.
 
 

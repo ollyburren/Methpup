@@ -163,26 +163,6 @@ my $F_FASTQ = $PROJECT{fastq_input_fwd};
 my $R_FASTQ = $PROJECT{fastq_input_rev};
 my $TAGFILE = $PROJECT{novobarcode_index_file};
 
-##############################
-## SET UP EACH GENE SETTINGS #
-##############################
-#my %GENES;
-#foreach my $sect(grep{/GENE/}$cfg->Sections()){
-#	(my $gname = $sect)=~s/GENE (.*)/\1/;
-#	unless($GENES{$gname}{forseq} = $cfg->val($sect,'forseq')){
-#		print STDERR "[ERROR] Need a forseq for linker for $sect\n";
-#	}
-#	unless($GENES{$gname}{revseq} = $cfg->val($sect,'revseq')){
-#		print STDERR "[ERROR] Need a revseq for linker for $sect\n";
-#	}
-#	unless($GENES{$gname}{linker_length} = $cfg->val($sect,'linker_length')){
-#		print STDERR "[ERROR] Need a linker_length for linker for $sect\n";
-#	}
-#}
-
-#print Dumper(\%PROGRAMS)."\n";
-#print Dumper(\%PROJECT)."\n";
-#print Dumper(\%GENES)."\n";
 
 ################
 ## DEMULTIPLEX #
@@ -374,11 +354,70 @@ my $mp = Methpup::Runnable::Methplot->new(
 	})->run_step;
 
 
+###############
+## GENE2READ ##
+###############
+
+my $g2r = Methpup::Runnable::Gene2Read->new(
+	log_dir=>"$PROJECT_DIR/log/g2r/",
+	binary=>"$Bin/perl/gene2read.pl",
+	debug_flag=>1,          
+	macd_driver=>$DRIVER,
+	previous_step=>$bowtie,
+	inputs=>{
+		in_dir=>"$PROJECT_DIR/pipeline/",
+		fasta_file=>$PROJECT{'ref_seq_file'}
+	},
+	outputs=>{
+	})->run_step;
+
+########################################
+## PLOT READ DROP OUT BY GENE PRODUCT ##
+########################################
+
+my $mp = Methpup::Runnable::GeneDropoutPlot->new(
+	log_dir=>"$PROJECT_DIR/log/gene_drop_out_plot/",
+	binary=>"/usr/bin/Rscript",
+	env_settings=>"R_LIBS=$ENV{R_LIBS}",
+	debug_flag=>1,          
+	macd_driver=>$DRIVER,
+	previous_step=>$g2r,
+	inputs=>{
+		in_dir=>"$PROJECT_DIR/pipeline/",
+		out_dir=>"$PROJECT_DIR/gene_drop_out_plot/",
+		script=>"$Bin/R/dropout_plot.R",
+		file_pattern=>"*gene2read.tab"
+	},
+	outputs=>{
+	})->run_step;
+
+########################
+## PLOT BS EFFICIENCY ##
+########################
+
+my $mp = Methpup::Runnable::BSEfficiencyPlot->new(
+	log_dir=>"$PROJECT_DIR/log/bsefficiency_plot/",
+	binary=>"/usr/bin/Rscript",
+	env_settings=>"R_LIBS=$ENV{R_LIBS}",
+	debug_flag=>1,          
+	macd_driver=>$DRIVER,
+	previous_step=>$cm,
+	inputs=>{
+		in_dir=>"$PROJECT_DIR/pipeline/",
+		out_dir=>"$PROJECT_DIR/bsefficiency_plot/",
+		script=>"$Bin/R/bs_efficiency_plot.R",
+		file_pattern=>"*efficiency.methplot"
+	},
+	outputs=>{
+	})->run_step;
+
 
 
 ##################
 ## REPORTING ETC #
 ##################
+
+## NOT RUN FOR TIME BEING OTHER PLOTS BETTER
 
 my $cm = Methpup::Runnable::Reports->new(
 	log_dir=>"$PROJECT_DIR/log/reports/",
@@ -392,7 +431,7 @@ my $cm = Methpup::Runnable::Reports->new(
 	},
 	outputs=>{
 		out_dir=>$odir
-	})->run_step;
+	});#->run_step;
 
 
 

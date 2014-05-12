@@ -3,6 +3,14 @@
 library(reshape)
 library(ggplot2)
 
+## GLOBAL VARIABLES
+
+PDF_FILE_NAME="bs.efficiency.pdf"
+# assume below this threshold that reads are not being used for analysis
+READ_COUNT_THRESH=300
+#y axis range most are above 90% conversion.
+YLIMS=c(0.9,1.0)
+
 ## EXPECTS
 
 in.file=
@@ -18,7 +26,6 @@ if(length(args) < 2){
   }
 }
 
-#THRESH<-0.95
 tab<-read.table(file=in.file,sep="\t",stringsAsFactors=FALSE)
 names(tab)<-c('gene','seq','read_count','well')
 tab$nT<-nchar(gsub("C","",tab$seq)) * tab$read_count
@@ -45,17 +52,18 @@ summ.tab$col <- factor(summ.tab$col, levels = sort(unique(summ.tab$col)))
 summ.tab<-summ.tab[order(summ.tab$plate,summ.tab$col,summ.tab$row),]
 summ.tab$well<-factor(summ.tab$well,level=unique(summ.tab$well))
 
-summ.tab<-summ.tab[summ.tab$total_reads>10,]
+summ.tab<-summ.tab[summ.tab$total_reads>READ_COUNT_THRESH,]
 
 plot.df<-split(summ.tab,summ.tab$plate)
-ofile=ofile=paste(out.dir,"bs_conversion.pdf",sep="/")
+ofile=ofile=paste(out.dir,PDF_FILE_NAME,sep="/")
 pdf(ofile,onefile=TRUE,height=8,width=14)
 theme_set(theme_bw())
 sapply(seq_along(plot.df),function(i){
 	p<-plot.df[[i]]
-	gg<-ggplot(p,aes(x=gene,y=conversion)) + geom_bar(position="dodge",stat="identity") 
+	gg<-ggplot(p,aes(x=gene,y=conversion)) + geom_bar(position="dodge",stat="identity",fill="white",colour="black") 
 	gg<-gg + geom_text(position=position_dodge(width=0.9),color="black",size=3,aes(label=total_reads,y=0.95),angle=-90) 
-	gg<-gg + xlab("Percentage conversion") + guides(fill=guide_legend(title="95% Conversion")) + coord_cartesian(xlim=NULL,ylim=c(0.9,1))
+	#gg<-gg + xlab("Proportion converted") + guides(fill=guide_legend(title="95% Conversion")) + coord_cartesian(xlim=NULL,ylim=YLIMS)
+	gg<-gg + ylab ("Proportion converted") + xlab("Genes") + coord_cartesian(xlim=NULL,ylim=YLIMS)
 	gg<-gg + facet_grid(row ~ col)
 	gg<-gg + labs(title=paste("Plate",names(plot.df)[i])) + theme(axis.text.x=element_text(angle = -90, hjust = 0))
 	print(gg)

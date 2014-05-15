@@ -29,8 +29,8 @@ sub run{
 	foreach my $d(@dirs){
 		my $rdir = "$d/$SUBDIR_NAME/";
 		if(-d $rdir){
-			#$self->verbose("Would remove $d");
-			File::Path::remove_tree($d,{keep_root => 1,result=> \my $del_dirs});
+			$self->verbose("Would remove $rdir");
+			File::Path::remove_tree($rdir,{keep_root => 1,result=> \my $del_dirs});
 		}
 		Macd::Utils::mkpath_wrapper($rdir);
 		my $id = basename($d);

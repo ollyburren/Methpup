@@ -42,7 +42,10 @@ sub run{
 		push @params, "-trimlog ${dname}${pef}_trimmomatic.log";
 		push @params, join(" ",@files);
 		push @params, join(" ",map{s/\.(fq|fastq)\.gz$//;"${dname}$_.fq.gz ${dname}${_}.unpaired.fq.gz"}map{basename($_)}@files);
-		push @params, 'HEADCROP:'.$self->inputs->{linker_length}.' '.$self->inputs->{ops};
+    if($self->inputs->{linker_length} > 0){
+		  push @params, 'HEADCROP:'.$self->inputs->{linker_length};
+    }
+		push @params, $self->inputs->{ops};
 		my $cmd = join(" ",$JAVA_JAR,$self->binary,@params);
 		$self->verbose($cmd);
 		$self->step->add_job(Macd::Step::Job->new(command=>$cmd));

@@ -233,6 +233,7 @@ my $cutadapt = Methpup::Runnable::Cutadapt->new(
 	macd_driver=>$DRIVER,
 	previous_step=>$trimmo,
 	inputs=>{
+		read_strand=>$PROJECT{read_strand},
 		forseq=>$PROJECT{forseq},
 		revseq=>$PROJECT{revseq},
 		linformin=>$PROJECT{formin},        
@@ -365,6 +366,7 @@ my $g2r = Methpup::Runnable::Gene2Read->new(
 	macd_driver=>$DRIVER,
 	previous_step=>$bowtie,
 	inputs=>{
+		read_strand=>$PROJECT{read_strand},
 		in_dir=>"$PROJECT_DIR/pipeline/",
 		fasta_file=>$PROJECT{'ref_seq_file'}
 	},

@@ -18,6 +18,7 @@ use constant _inputs_expected => {
 	linrevmin=>'number',
 	pe_file_list=>'hashref',
 	trimmo_sub=>'string',
+	read_strand=>'string'
 };
 
 use constant _defaults => {
@@ -25,6 +26,12 @@ use constant _defaults => {
 	
 sub run{
 	my $self=shift;
+	## If reads are on negative strand then swap adaptor sequences.
+	if ($self->inputs->{read_strand} == '-'){
+		my $tmp=$self->inputs->{forseq};
+		$self->inputs->{forseq}=$self->inputs->{revseq};
+		$self->inputs->{revseq}=$tmp;
+	}
 	my %pe_list = %{$self->inputs->{pe_file_list}};
 	foreach my $pef(keys(%pe_list)){
 		$self->verbose("Cutadapt processing $pef");

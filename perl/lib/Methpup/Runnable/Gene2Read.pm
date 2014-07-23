@@ -15,6 +15,7 @@ my $SUBDIR_NAME = 'gene2read';
 use constant _inputs_expected => {
 	in_dir=>'file',
 	fasta_file=>'file',
+	read_strand=>'string'
 };
 
 use constant _defaults => {
@@ -27,6 +28,8 @@ sub run{
 	opendir(DIR,$idir) || die "Cannot open $idir\n";
 	my @dirs = map{"$idir/$_"}grep{-d "$idir/$_" && $_ !~/^[\.]+/}readdir(DIR);
 	foreach my $d(@dirs){
+		## skip NOT_CALLED directory
+		next if $d=~/NOT_CALLED/;
 		my $rdir = "$d/$SUBDIR_NAME/";
 		if(-d $rdir){
 			$self->verbose("Would remove $rdir");
@@ -37,6 +40,7 @@ sub run{
 		my $ofile = "${rdir}$id.gene2read.tab";
 		my @params = "-d $d";
 		push @params, "-f ".$self->inputs->{fasta_file};
+		push @params, "-r " if $self->inputs->{read_strand}=='-';
 		push @params, "> $ofile";
 		my $cmd = join(" ",'perl',$self->binary,@params);
 		$self->verbose($cmd);

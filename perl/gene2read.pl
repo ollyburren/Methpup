@@ -25,19 +25,22 @@ my $SLENGTH=13;
 
 
 my $USAGE=<<EOL;
-perl $0 -[d]ir -[f]asta > outfile
+perl $0 -[d]ir -[f]asta -[r]evcomp > outfile
 
 	dir - top level directory containing well based Methpup analysis.
 	fasta - path to FASTA formatted design file for experiment.
+	revcomp - reads are reverse complemented with respect to reference
 	
 Outputs a tab delimited file of results to STDOUT
 EOL
 
-my ($fasta,$dir,$help);
+my ($fasta,$dir,$revcomp,$help);
 GetOptions (
 	'dir|d=s' => \$dir,
 	'fasta|f=s' => \$fasta,
+	'revcomp|r'=>\$revcomp,
 	'help|h'=>\$help);
+
 
 my $ERROR_FLAG;
 
@@ -78,7 +81,7 @@ if($ERROR_FLAG){
 
 
 
-my $greps = getIndex($fasta,$START_POS,$SLENGTH);
+my $greps = getIndex($fasta,$START_POS,$SLENGTH,$revcomp);
 my $id = basename($dir);
                                          
 my %RESULTS;
@@ -114,7 +117,7 @@ foreach my $step(qw/Demultiplex Trimmomatic Cutadapt FLASH Bowtie/){
 	
 
 sub getIndex{
-	my($fa,$start,$minlen)=@_;
+	my($fa,$start,$minlen,$revcomp)=@_;
 	open(FASTA,"$fa") || die "Cannot open $fa\n";
 	my %results;
 	my ($gene,$seq);
@@ -133,7 +136,6 @@ sub getIndex{
 	my %return;                            
 	foreach my $g(keys %results){
 		my $seq = substr($results{$g},$start,$minlen);
-		    
 		if($return{$seq}){
 			die "COLLISION $g\n";
 		}else{
@@ -149,6 +151,11 @@ sub getIndex{
 			}
 			if(@match!=0){
 				print STDERR "$g $seq matches ".join(",",@match)." product(s)\n";
+			}
+			if($revcomp){
+				print STDERR "Reverse complementing\n";
+				$seq=~tr/AGCT/TCGA/;
+				$seq=reverse($seq);
 			}
 			$return{$seq}=$g;
 		}

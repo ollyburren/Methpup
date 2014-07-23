@@ -86,7 +86,11 @@ my $id = basename($dir);
                                          
 my %RESULTS;
 find(sub{
-		next unless /(\.fwd\.fq\.gz$)|(\.fwd\.fq\.gz\.extendedFrags)/;
+		if($revcomp){
+			next unless /(\.rev\.fq\.gz$)|(\.rev\.fq\.gz\.extendedFrags)/;
+		}else{
+			next unless /(\.fwd\.fq\.gz$)|(\.fwd\.fq\.gz\.extendedFrags)/;
+		}
 		next if /sam.gz$/;
 		next if -d  $File::Find::name;    
 		my $tdir = $STEPS{basename(dirname($File::Find::name))} || 'Demultiplex';       
@@ -151,11 +155,6 @@ sub getIndex{
 			}
 			if(@match!=0){
 				print STDERR "$g $seq matches ".join(",",@match)." product(s)\n";
-			}
-			if($revcomp){
-				print STDERR "Reverse complementing\n";
-				$seq=~tr/AGCT/TCGA/;
-				$seq=reverse($seq);
 			}
 			$return{$seq}=$g;
 		}

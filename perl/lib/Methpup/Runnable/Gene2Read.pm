@@ -40,7 +40,7 @@ sub run{
 		my $ofile = "${rdir}$id.gene2read.tab";
 		my @params = "-d $d";
 		push @params, "-f ".$self->inputs->{fasta_file};
-		push @params, "-r " if $self->inputs->{read_strand}=='-';
+		push @params, "-r " if $self->inputs->{read_strand} eq '-';
 		push @params, "> $ofile";
 		my $cmd = join(" ",'perl',$self->binary,@params);
 		$self->verbose($cmd);

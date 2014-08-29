@@ -27,7 +27,7 @@ use constant _defaults => {
 sub run{
 	my $self=shift;
 	## If reads are on negative strand then swap adaptor sequences.
-	if ($self->inputs->{read_strand} == '-'){
+	if ($self->inputs->{read_strand} eq '-'){
 		my $tmp=$self->inputs->{forseq};
 		$self->inputs->{forseq}=$self->inputs->{revseq};
 		$self->inputs->{revseq}=$tmp;
